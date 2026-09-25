@@ -1,27 +1,14 @@
-# StreamLens releases
+# StreamLens
 
-Installers and automatic-update files for **StreamLens**, a stream diagnostics
-companion for Plex Media Server: it shows why a stream is transcoding or
-buffering, and whether the cause is the server, the network, the device or the
-app settings.
+**Coming soon.**
 
-## Download
+StreamLens shows why a Plex stream buffers or converts, and whose side the
+problem is on: the server, the network, the device or the app settings.
 
-**[StreamLensSetup.exe](https://github.com/buddywilson92-star/streamlens-releases/releases/latest/download/StreamLensSetup.exe)**
-(Windows 10 or 11, or Windows Server 2019 or later, 64-bit)
+This repository holds the files that installed copies of StreamLens use to
+keep themselves up to date. It is not a download page.
 
-Run it and choose:
+More at [getstreamlens.com](https://getstreamlens.com).
 
-- **Host** on the PC that runs Plex Media Server, or
-- **Client** on any other Windows PC that should watch a host.
-
-StreamLens is in early access. The installer is not code-signed yet, so Windows
-may show "Windows protected your PC": choose **More info**, then **Run anyway**.
-
-## Updates
-
-Installed copies update themselves from this page. Every update is signed, and
-installs accept only updates carrying that signature. Updates replace the
-program only; settings, history and logs are never touched.
-
-This repository holds release files only; the source code is not here.
+StreamLens is made by TNT Systems. StreamLens is not affiliated with, endorsed
+by or sponsored by Plex, Inc. Plex is a trademark of Plex, Inc.
