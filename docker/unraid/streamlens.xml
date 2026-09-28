@@ -1,0 +1,34 @@
+<?xml version="1.0"?>
+<!-- Unraid Docker template for StreamLens. Guide ("Unraid"):
+     https://github.com/buddywilson92-star/streamlens-releases/blob/main/docker/README.md
+     Starts as root only long enough to give the appdata folder to nobody:users
+     (PUID 99 / PGID 100), then runs StreamLens as that user with no capabilities. -->
+<Container version="2">
+  <Name>StreamLens</Name>
+  <Repository>docker.io/tntdevteam/streamlens:1</Repository>
+  <Registry>https://hub.docker.com/r/tntdevteam/streamlens</Registry>
+  <Network>bridge</Network>
+  <MyIP/>
+  <Shell>sh</Shell>
+  <Privileged>false</Privileged>
+  <Support>https://github.com/buddywilson92-star/streamlens-releases/blob/main/docker/README.md#unraid</Support>
+  <Project>https://getstreamlens.com</Project>
+  <Overview>StreamLens explains why a Plex, Jellyfin or Emby stream transcodes or buffers, and whose side the problem is on: the server, the network or the player. Open the WebUI, enter the setup code from the container log, create your admin account and connect your media server.</Overview>
+  <Category>MediaServer:Other Tools:</Category>
+  <WebUI>http://[IP]:[PORT:3737]/</WebUI>
+  <TemplateURL>https://raw.githubusercontent.com/buddywilson92-star/streamlens-releases/main/docker/unraid/streamlens.xml</TemplateURL>
+  <Icon/>
+  <ExtraParams>--init --user 0:0 --read-only --tmpfs /tmp --cap-drop ALL --cap-add CHOWN --cap-add FOWNER --cap-add DAC_OVERRIDE --cap-add SETUID --cap-add SETGID --cap-add SETPCAP --security-opt no-new-privileges:true --sysctl net.ipv4.ping_group_range="0 2147483647"</ExtraParams>
+  <PostArgs/>
+  <DonateText/>
+  <DonateLink/>
+  <Config Name="Dashboard port" Target="3737" Default="3737" Mode="tcp" Description="Web dashboard" Type="Port" Display="always" Required="true" Mask="false">3737</Config>
+  <Config Name="Data" Target="/data" Default="/mnt/user/appdata/streamlens" Mode="rw" Description="Settings, history and logs. Keep private." Type="Path" Display="always" Required="true" Mask="false">/mnt/user/appdata/streamlens</Config>
+  <Config Name="Plex logs (optional)" Target="/plex-logs" Default="" Mode="ro" Description="Plex's Logs folder, read-only, for the Dolby Vision and CPU-fallback evidence. For linuxserver/plex: /mnt/user/appdata/plex/Library/Application Support/Plex Media Server/Logs" Type="Path" Display="always" Required="false" Mask="false"/>
+  <Config Name="Media (optional)" Target="/media" Default="" Mode="ro" Description="Your media, read-only, for keyframe analysis. Say where Plex sees it in Media path map." Type="Path" Display="advanced" Required="false" Mask="false"/>
+  <Config Name="Media path map (optional)" Target="STREAMLENS_PATH_MAP" Default="" Mode="" Description="Where Plex sees your media = where it is mounted here, for example /data/media=/media (several: separate with ;)" Type="Variable" Display="advanced" Required="false" Mask="false"/>
+  <Config Name="Name shown to other computers (optional)" Target="STREAMLENS_NAME" Default="" Mode="" Description="Default: the Plex server's name" Type="Variable" Display="advanced" Required="false" Mask="false"/>
+  <Config Name="PUID" Target="PUID" Default="99" Mode="" Description="User that owns the data folder (99 = nobody)" Type="Variable" Display="advanced" Required="true" Mask="false">99</Config>
+  <Config Name="PGID" Target="PGID" Default="100" Mode="" Description="Group that owns the data folder (100 = users)" Type="Variable" Display="advanced" Required="true" Mask="false">100</Config>
+  <Config Name="Time zone" Target="TZ" Default="Etc/UTC" Mode="" Description="For example America/Chicago" Type="Variable" Display="always" Required="false" Mask="false">Etc/UTC</Config>
+</Container>
