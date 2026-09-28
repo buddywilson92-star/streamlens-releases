@@ -1,0 +1,106 @@
+# StreamLens and Plex Media Server together in one compose project, on any
+# computer with Docker. StreamLens reaches Plex by its service name
+# (http://plex:32400) and reads Plex's log folder read-only for the Dolby Vision
+# and CPU-fallback evidence. Guide ("All in one"):
+# https://github.com/buddywilson92-star/streamlens-releases/blob/main/docker/README.md
+#
+# In an empty folder, with this file saved as docker-compose.yml
+# (curl -fL -o docker-compose.yml https://raw.githubusercontent.com/buddywilson92-star/streamlens-releases/main/docker/docker-compose.plex.yml):
+#   mkdir -p plex/config plex/logs plex/transcode streamlens/data media
+#   sudo chown -R 1000:1000 plex streamlens       (Linux or a NAS; not on Docker Desktop)
+#   New Plex server: get a claim code at https://plex.tv/claim (valid 4 minutes),
+#   put it in PLEX_CLAIM below, then start both:
+#   docker compose up -d
+#   Plex: http://<this computer's address>:32400/web
+#   StreamLens: http://<this computer's address>:3737 (the setup code is in: docker logs streamlens)
+#   In StreamLens's setup, sign in to Plex: it uses http://plex:32400 (PLEX_URL below).
+#
+# Then in Plex, Settings, Network (Show Advanced), set both and Save Changes:
+#   LAN Networks:                your home network, e.g. 192.168.1.0/24 (in a Docker
+#                                network Plex otherwise counts your own devices as
+#                                remote and holds them to its remote-streaming quality)
+#   Custom server access URLs:   this computer's own address, e.g. http://192.168.1.10:32400
+#                                (Plex only knows its container address, 172.x, which
+#                                your TV and phone can't reach: without this they play
+#                                through Plex's relay, slow and limited)
+# Linux only, instead of both: Plex with host networking. In the plex service
+# replace the two ports: lines with network_mode: host; in the streamlens service
+# set PLEX_URL to http://host.docker.internal:32400 and add the extra_hosts: lines
+# from docker-compose.yml.
+name: streamlens-plex
+services:
+  plex:
+    image: lscr.io/linuxserver/plex:latest
+    container_name: plex
+    hostname: plex
+    restart: unless-stopped
+    environment:
+      PUID: "1000"
+      PGID: "1000"
+      TZ: "Etc/UTC"                      # your time zone, e.g. America/Chicago
+      VERSION: "docker"
+      # PLEX_CLAIM: "claim-xxxxxxxxxxxxxxxxxxxx"   # only for the very first start of a new server
+    ports:
+      - "32400:32400"                    # Plex's web app and its players
+    volumes:
+      - ./plex/config:/config
+      # Plex's log folder, in its own folder so StreamLens can read just the logs
+      - "./plex/logs:/config/Library/Application Support/Plex Media Server/Logs"
+      - ./plex/transcode:/transcode
+      - ./media:/media                   # your films and shows: change ./media to where they are
+    # Intel or AMD hardware transcoding (Linux, e.g. a Synology, QNAP or Unraid box with
+    # Intel graphics; Plex Pass needed): uncomment, then turn on "Use hardware acceleration
+    # when available" in Plex's Transcoder settings
+    # devices:
+    #   - /dev/dri:/dev/dri
+    # NVIDIA hardware transcoding (Linux with the NVIDIA Container Toolkit): uncomment
+    # deploy:
+    #   resources:
+    #     reservations:
+    #       devices:
+    #         - driver: nvidia
+    #           count: all
+    #           capabilities: [gpu, video]
+
+  streamlens:
+    image: docker.io/tntdevteam/streamlens:1
+    container_name: streamlens
+    hostname: streamlens
+    restart: unless-stopped
+    init: true
+    user: "1000:1000"                    # must be able to write to ./streamlens/data
+    depends_on:
+      - plex
+    ports:
+      - "3737:3737"
+    environment:
+      TZ: "Etc/UTC"
+      PLEX_URL: "http://plex:32400"      # Plex by its service name, inside this project's network
+      # PLEX_TOKEN_FILE: /run/secrets/plex_token     # instead of signing in during setup (the guide, "Keys and Docker secrets")
+      # STREAMLENS_ADDRESSES: "192.168.1.10"         # the address your phones use (this computer's LAN address)
+    # secrets:
+    #   - plex_token
+    volumes:
+      - ./streamlens/data:/data          # settings, history, logs: keep this folder private
+      - ./plex/logs:/plex-logs:ro        # Plex's logs, read-only (the evidence StreamLens reads)
+      - ./media:/media:ro                # the same media, read-only, at the same path Plex uses: keyframe analysis
+    # Graphics tiles (the guide, "Graphics: NVIDIA, AMD and Intel"): AMD and Intel graphics
+    # show without anything here (StreamLens reads /sys, not /dev/dri). Optional: how much of
+    # the graphics Plex's conversions use needs the computer's process list (Plex runs as the
+    # same user here, PUID 1000). Trade-off: StreamLens could then also read Plex's files
+    # (its key in Preferences.xml) and stop Plex (the guide, "pid: host: a trade-off"):
+    # pid: host
+    # With an NVIDIA card: the same deploy: block as the plex service, capabilities: [gpu, utility]
+    read_only: true
+    tmpfs:
+      - /tmp
+    cap_drop:
+      - ALL
+    security_opt:
+      - "no-new-privileges:true"
+    sysctls:
+      net.ipv4.ping_group_range: "0 2147483647"
+    stop_grace_period: 15s
+# secrets:
+#   plex_token:
+#     file: ./secrets/plex_token.txt
