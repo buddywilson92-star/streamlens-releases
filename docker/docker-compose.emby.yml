@@ -1,0 +1,81 @@
+# StreamLens and Emby together in one compose project, on any computer with
+# Docker (Emby support in StreamLens is new: beta). StreamLens reaches Emby by
+# its service name (http://emby:8096). It reads the evidence (each conversion's
+# ffmpeg log) over Emby's own API with an administrator key, so no log folder
+# is mounted. Guide ("All in one"):
+# https://github.com/buddywilson92-star/streamlens-releases/blob/main/docker/README.md
+#
+# In an empty folder, with this file saved as docker-compose.yml
+# (curl -fL -o docker-compose.yml https://raw.githubusercontent.com/buddywilson92-star/streamlens-releases/main/docker/docker-compose.emby.yml):
+#   mkdir -p emby/config streamlens/data secrets media
+#   sudo chown -R 1000:1000 emby streamlens       (Linux or a NAS; not on Docker Desktop)
+#   docker compose up -d emby
+#   Emby: http://<this computer's address>:8096, finish its first-run wizard
+#   Then either
+#     a) docker compose up -d, open StreamLens (http://<this computer's address>:3737;
+#        the setup code is in: docker logs streamlens); setup opens on Emby with its
+#        address filled in: paste an API key (Emby: the gear icon, Advanced, Api Keys,
+#        New Api Key), or
+#     b) keep the key in a Docker secret: save it alone in secrets/emby_api_key.txt
+#        (readable by user 1000), uncomment the three secrets parts below, then
+#        docker compose up -d
+name: streamlens-emby
+services:
+  emby:
+    image: emby/embyserver:latest
+    container_name: emby
+    hostname: emby
+    restart: unless-stopped
+    environment:
+      UID: "1000"                        # Emby runs as this user and group
+      GID: "1000"
+      TZ: "Etc/UTC"                      # your time zone, e.g. America/Chicago
+    ports:
+      - "8096:8096"                      # Emby's web app and its players
+    volumes:
+      - ./emby/config:/config
+      - ./media:/media:ro                # your films and shows: change ./media to where they are
+    # Intel/AMD hardware transcoding (Linux): uncomment (Emby Premiere needed)
+    # devices:
+    #   - /dev/dri:/dev/dri
+
+  streamlens:
+    image: docker.io/tntdevteam/streamlens:1
+    container_name: streamlens
+    hostname: streamlens
+    restart: unless-stopped
+    init: true
+    user: "1000:1000"                    # must be able to write to ./streamlens/data
+    depends_on:
+      - emby
+    ports:
+      - "3737:3737"
+    environment:
+      TZ: "Etc/UTC"
+      EMBY_URL: "http://emby:8096"       # Emby by its service name, inside this project's network
+      # EMBY_API_KEY_FILE: /run/secrets/emby_api_key
+      # STREAMLENS_ADDRESSES: "192.168.1.10"  # the address your phones use (this computer's LAN address)
+    # secrets:
+    #   - emby_api_key
+    volumes:
+      - ./streamlens/data:/data          # settings, history, logs: keep this folder private
+      - ./media:/media:ro                # the same media at the same path Emby uses: keyframe analysis
+    # Graphics tiles (the guide, "Graphics: NVIDIA, AMD and Intel"): AMD and Intel graphics
+    # show without anything here (StreamLens reads /sys, not /dev/dri). Optional: how much of
+    # the graphics Emby's conversions use needs the computer's process list (Emby runs as the
+    # same user here, 1000). Trade-off: StreamLens could then also read Emby's files and
+    # stop it (the guide, "pid: host: a trade-off"):
+    # pid: host
+    read_only: true
+    tmpfs:
+      - /tmp
+    cap_drop:
+      - ALL
+    security_opt:
+      - "no-new-privileges:true"
+    sysctls:
+      net.ipv4.ping_group_range: "0 2147483647"
+    stop_grace_period: 15s
+# secrets:
+#   emby_api_key:
+#     file: ./secrets/emby_api_key.txt
