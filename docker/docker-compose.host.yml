@@ -1,0 +1,48 @@
+# StreamLens with host networking: Linux Docker hosts only (Synology, Unraid,
+# TrueNAS, QNAP, plain Linux). Use this instead of docker-compose.yml when StreamLens
+# on your Windows PCs should find this one by itself (LAN discovery on UDP 3737),
+# or when your media server runs on the same box and listens only on 127.0.0.1.
+# Save it as docker-compose.yml. Guide ("Host networking"):
+# https://github.com/buddywilson92-star/streamlens-releases/blob/main/docker/README.md
+#
+# Not for Docker Desktop on Windows or macOS: there "host" is Docker's own Linux
+# virtual machine, not your computer, so other computers still can't find
+# StreamLens and nothing is gained. Use docker-compose.yml there.
+name: streamlens
+services:
+  streamlens:
+    image: docker.io/tntdevteam/streamlens:1
+    container_name: streamlens
+    restart: unless-stopped              # also what brings it back after Restart in Settings (it exits with code 3)
+    init: true
+    user: "1000:1000"                    # must be able to write to ./data
+    network_mode: host                   # dashboard on TCP 3737, discovery on UDP 3737
+    environment:
+      TZ: "Etc/UTC"
+      # Optional settings (STREAMLENS_NAME, STREAMLENS_ADDRESSES, PLEX_URL, PLEX_TOKEN_FILE, JELLYFIN_URL, JELLYFIN_API_KEY_FILE, EMBY_URL, EMBY_API_KEY_FILE, STREAMLENS_PATH_MAP):
+      # as in docker-compose.yml. PLEX_URL: "http://127.0.0.1:32400" works here for Plex on this box.
+      # STREAMLENS_ADDRESSES: "192.168.1.10"          # the address your phones use: needed with host networking too
+    # secrets:                           # a key from a file, as in docker-compose.yml
+    #   - plex_token
+    volumes:
+      - ./data:/data
+      # - "/path/to/Plex Media Server/Logs:/plex-logs:ro"
+    # Graphics tiles: as in docker-compose.yml (AMD and Intel from /sys, no /dev/dri;
+    # optional pid: host for the conversions' share, with its trade-off; an NVIDIA card with the
+    # deploy: block there)
+    # pid: host
+    read_only: true
+    tmpfs:
+      - /tmp
+    cap_drop:
+      - ALL
+    # Ping uses unprivileged ICMP sockets, allowed by the host's
+    # net.ipv4.ping_group_range (the default on current systemd-based systems;
+    # network sysctls can't be set here with host networking). If StreamLens
+    # shows "ping blocked": sudo sysctl -w net.ipv4.ping_group_range="0 2147483647"
+    security_opt:
+      - "no-new-privileges:true"
+    stop_grace_period: 15s
+# secrets:
+#   plex_token:
+#     file: ./secrets/plex_token.txt
