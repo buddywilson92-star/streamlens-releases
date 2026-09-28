@@ -1,0 +1,83 @@
+# StreamLens and Jellyfin together in one compose project, on any computer with
+# Docker (Jellyfin support in StreamLens is new: beta). StreamLens reaches
+# Jellyfin by its service name (http://jellyfin:8096). It reads the evidence
+# (each conversion's ffmpeg log) over Jellyfin's own API with an administrator
+# key, so no log folder is mounted. Guide ("All in one"):
+# https://github.com/buddywilson92-star/streamlens-releases/blob/main/docker/README.md
+#
+# In an empty folder, with this file saved as docker-compose.yml
+# (curl -fL -o docker-compose.yml https://raw.githubusercontent.com/buddywilson92-star/streamlens-releases/main/docker/docker-compose.jellyfin.yml):
+#   mkdir -p jellyfin/config jellyfin/cache streamlens/data secrets media
+#   sudo chown -R 1000:1000 jellyfin streamlens   (Linux or a NAS; not on Docker Desktop)
+#   docker compose up -d jellyfin
+#   Jellyfin: http://<this computer's address>:8096, finish its first-run wizard
+#   Then either
+#     a) docker compose up -d, open StreamLens (http://<this computer's address>:3737;
+#        the setup code is in: docker logs streamlens); setup opens on Jellyfin with
+#        its address filled in: paste an API key (Jellyfin: Dashboard, API Keys,
+#        New API Key), or
+#     b) keep the key in a Docker secret: save it alone in secrets/jellyfin_api_key.txt
+#        (readable by user 1000), uncomment the three secrets parts below, then
+#        docker compose up -d
+name: streamlens-jellyfin
+services:
+  jellyfin:
+    image: jellyfin/jellyfin:latest
+    container_name: jellyfin
+    hostname: jellyfin
+    restart: unless-stopped
+    user: "1000:1000"                    # must be able to write to ./jellyfin
+    ports:
+      - "8096:8096"                      # Jellyfin's web app and its players
+    environment:
+      TZ: "Etc/UTC"                      # your time zone, e.g. America/Chicago
+      # JELLYFIN_PublishedServerUrl: "http://192.168.1.10:8096"   # the address Jellyfin's apps are told
+    volumes:
+      - ./jellyfin/config:/config
+      - ./jellyfin/cache:/cache
+      - ./media:/media:ro                # your films and shows: change ./media to where they are
+    # Intel/AMD hardware transcoding (Linux): uncomment, then turn it on in Jellyfin's Playback settings
+    # (as user 1000, also add the device's group: group_add: ["<number from: getent group render>"])
+    # devices:
+    #   - /dev/dri:/dev/dri
+
+  streamlens:
+    image: docker.io/tntdevteam/streamlens:1
+    container_name: streamlens
+    hostname: streamlens
+    restart: unless-stopped
+    init: true
+    user: "1000:1000"                    # must be able to write to ./streamlens/data
+    depends_on:
+      - jellyfin
+    ports:
+      - "3737:3737"
+    environment:
+      TZ: "Etc/UTC"
+      JELLYFIN_URL: "http://jellyfin:8096"   # Jellyfin by its service name, inside this project's network
+      # JELLYFIN_API_KEY_FILE: /run/secrets/jellyfin_api_key
+      # STREAMLENS_ADDRESSES: "192.168.1.10"  # the address your phones use (this computer's LAN address)
+    # secrets:
+    #   - jellyfin_api_key
+    volumes:
+      - ./streamlens/data:/data          # settings, history, logs: keep this folder private
+      - ./media:/media:ro                # the same media at the same path Jellyfin uses: keyframe analysis
+    # Graphics tiles (the guide, "Graphics: NVIDIA, AMD and Intel"): AMD and Intel graphics
+    # show without anything here (StreamLens reads /sys, not /dev/dri). Optional: how much of
+    # the graphics Jellyfin's conversions use needs the computer's process list (Jellyfin
+    # runs as the same user here, 1000). Trade-off: StreamLens could then also read
+    # Jellyfin's files and stop it (the guide, "pid: host: a trade-off"):
+    # pid: host
+    read_only: true
+    tmpfs:
+      - /tmp
+    cap_drop:
+      - ALL
+    security_opt:
+      - "no-new-privileges:true"
+    sysctls:
+      net.ipv4.ping_group_range: "0 2147483647"
+    stop_grace_period: 15s
+# secrets:
+#   jellyfin_api_key:
+#     file: ./secrets/jellyfin_api_key.txt
